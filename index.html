@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>午饭转盘</title>
+<style>
+  :root {
+    --ink: #2b2118;
+    --cream: #faf6f0;
+    --border: #eadfd3;
+    --primary: #e2543a;
+    --primary-dark: #c9462f;
+    --muted: #b09a86;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+    background: var(--cream);
+    color: var(--ink);
+    min-height: 100vh;
+  }
+  .app {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 28px;
+    max-width: 1060px;
+    margin: 0 auto;
+    padding: 32px 24px;
+  }
+  @media (max-width: 860px) { .app { grid-template-columns: 1fr; } }
+  header { text-align: center; margin-bottom: 20px; }
+  h1 { font-size: 30px; font-weight: 800; }
+  .wheel-col { display: flex; flex-direction: column; align-items: center; }
+  .wheel-wrap {
+    position: relative;
+    width: min(500px, 92vw);
+    aspect-ratio: 1;
+    user-select: none;
+  }
+  canvas#wheel { position: absolute; inset: 0; width: 100%; height: 100%; }
+  canvas#confetti { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 6; }
+  .pointer {
+    position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+    width: 34px; height: 30px; z-index: 7;
+    filter: drop-shadow(0 3px 4px rgba(0,0,0,.3));
+  }
+  .hub {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 24%; aspect-ratio: 1; border-radius: 50%;
+    background: #fff; border: 3px solid var(--primary);
+    font-size: 19px; font-weight: 800; color: var(--ink);
+    cursor: pointer; z-index: 8;
+    box-shadow: 0 6px 18px rgba(0,0,0,.2);
+    transition: transform .15s;
+    font-family: inherit;
+  }
+  .hub:hover:not(:disabled) { transform: translate(-50%,-50%) scale(1.05); }
+  .hub:active:not(:disabled) { transform: translate(-50%,-50%) scale(.95); }
+  .hub:disabled { opacity: .7; cursor: wait; }
+  @media (max-width: 480px) { .hub { font-size: 16px; } }
+  .result {
+    margin-top: 22px;
+    font-size: 24px; font-weight: 800;
+    background: #fff; border: 2px dashed var(--primary);
+    border-radius: 8px; padding: 12px 26px;
+    display: none;
+  }
+  .result.show { display: inline-block; animation: pop .4s cubic-bezier(.2,1.4,.4,1); }
+  @keyframes pop {
+    0% { transform: scale(.4); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .panel {
+    background: #fff; border: 1px solid var(--border);
+    border-radius: 8px; padding: 18px;
+    box-shadow: 0 2px 10px rgba(43,33,24,.05);
+    align-self: start;
+  }
+  .panel h2 { font-size: 17px; margin-bottom: 14px; }
+  .count-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-size: 14px; color: #6b5a4b; }
+  .count-row input {
+    width: 64px; padding: 6px; text-align: center;
+    border: 1px solid var(--border); border-radius: 6px; font-size: 14px;
+  }
+  #optionList {
+    list-style: none; max-height: 400px; overflow-y: auto;
+    margin: 12px 0; border-top: 1px solid var(--border);
+  }
+  #optionList li { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid #f3ece3; }
+  #optionList .idx { width: 26px; text-align: right; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+  #optionList input[type="text"] {
+    flex: 1; min-width: 0; padding: 6px 10px;
+    border: 1px solid var(--border); border-radius: 6px; font-size: 14px;
+    font-family: inherit;
+  }
+  #optionList input[type="text"]:focus { outline: 2px solid rgba(226,84,58,.25); border-color: var(--primary); }
+  .del {
+    width: 28px; height: 28px; flex-shrink: 0;
+    border: none; background: transparent; color: #c0392b;
+    font-size: 16px; cursor: pointer; border-radius: 6px; line-height: 1;
+  }
+  .del:hover { background: #fdeeec; }
+  .del:disabled { color: #d8cfc5; cursor: not-allowed; }
+  .btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .btn {
+    padding: 8px 14px; border-radius: 8px; border: 1px solid transparent;
+    font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: var(--primary-dark); }
+  .btn-ghost { background: #fff; border-color: var(--border); color: #6b5a4b; }
+  .btn-ghost:hover:not(:disabled) { background: #f7f1ea; }
+  .tools { display: flex; justify-content: flex-start; margin-top: 10px; }
+  .sound-btn { font-size: 13px; padding: 5px 10px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="wheel-col">
+    <header><h1>今天吃什么？</h1></header>
+    <div class="wheel-wrap" id="wheelWrap">
+      <canvas id="wheel"></canvas>
+      <canvas id="confetti"></canvas>
+      <svg class="pointer" viewBox="0 0 40 36"><polygon points="20,34 4,3 36,3" fill="#e2543a" stroke="#fff" stroke-width="3" stroke-linejoin="round"/></svg>
+      <button class="hub" id="spinBtn">开转</button>
+    </div>
+    <div class="result" id="result"></div>
+  </div>
+  <aside class="panel">
+    <h2>选项设置</h2>
+    <div class="count-row">
+      <label for="countInput">选项数量</label>
+      <input type="number" id="countInput" min="2" max="100" value="30">
+      <span>个</span>
+    </div>
+    <ul id="optionList"></ul>
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="addBtn">添加一项</button>
+      <button class="btn btn-primary" id="shuffleBtn">随机热门</button>
+      <button class="btn btn-ghost" id="resetBtn">恢复默认</button>
+    </div>
+    <div class="tools">
+      <button class="btn btn-ghost sound-btn" id="soundBtn">音效 开</button>
+    </div>
+  </aside>
+</div>
+<script>
+(function () {
+  'use strict';
+
+  var DEFAULT_OPTIONS = [
+    '红烧肉', '宫保鸡丁', '鱼香肉丝', '麻婆豆腐', '回锅肉',
+    '糖醋排骨', '可乐鸡翅', '西红柿炒蛋', '青椒肉丝', '酸菜鱼',
+    '水煮肉片', '辣子鸡', '口水鸡', '白切鸡', '红烧鱼',
+    '清蒸鲈鱼', '油焖大虾', '白灼虾', '梅菜扣肉', '东坡肉',
+    '红烧狮子头', '糖醋里脊', '锅包肉', '小鸡炖蘑菇', '大盘鸡',
+    '咖喱鸡', '黑椒牛柳', '番茄牛腩', '土豆炖牛肉', '红烧茄子'
+  ];
+
+  var POPULAR_POOL = [
+    '红烧肉', '宫保鸡丁', '鱼香肉丝', '麻婆豆腐', '回锅肉', '糖醋排骨',
+    '可乐鸡翅', '西红柿炒蛋', '青椒肉丝', '酸菜鱼', '水煮肉片', '辣子鸡',
+    '口水鸡', '白切鸡', '红烧鱼', '清蒸鲈鱼', '油焖大虾', '白灼虾',
+    '梅菜扣肉', '东坡肉', '红烧狮子头', '糖醋里脊', '锅包肉', '小鸡炖蘑菇',
+    '大盘鸡', '咖喱鸡', '黑椒牛柳', '番茄牛腩', '土豆炖牛肉', '红烧茄子',
+    '干煸四季豆', '地三鲜', '鱼香茄子', '韭菜炒蛋', '苦瓜炒蛋', '蚂蚁上树',
+    '京酱肉丝', '滑蛋虾仁', '蒜蓉西兰花', '蚝油生菜', '上汤娃娃菜', '干锅花菜',
+    '香菇滑鸡', '栗子焖鸡', '三杯鸡', '香辣虾', '椒盐虾', '蒜香排骨',
+    '椒盐排骨', '孜然羊肉', '葱爆羊肉', '红烧羊肉', '酱牛肉', '蒜泥白肉',
+    '夫妻肺片', '凉拌黄瓜', '皮蛋豆腐', '醋溜白菜', '尖椒土豆片', '干锅土豆片',
+    '东北乱炖', '猪肉炖粉条', '冬瓜排骨汤', '玉米排骨汤', '麻辣小龙虾'
+  ];
+
+  var STORE_KEY = 'lunch-wheel-options-v1';
+  var SOUND_KEY = 'lunch-wheel-sound-v1';
+  var PALETTE = [
+    '#e2543a', '#f2994a', '#f6c344', '#8bbf3f', '#3fa66a', '#2f9e9e',
+    '#3e7cb1', '#6b5ca5', '#a5578e', '#d45d79', '#c2793f', '#5f8f3e'
+  ];
+
+  function mix(hex, t) {
+    var n = parseInt(hex.slice(1), 16);
+    var r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    r = Math.round(r + (255 - r) * t);
+    g = Math.round(g + (255 - g) * t);
+    b = Math.round(b + (255 - b) * t);
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+  }
+  var LIGHT = PALETTE.map(function (c) { return mix(c, 0.25); });
+
+  var $ = function (s) { return document.querySelector(s); };
+  var canvas = $('#wheel'), ctx = canvas.getContext('2d');
+  var confCv = $('#confetti'), cctx = confCv.getContext('2d');
+  var wrap = $('#wheelWrap'), spinBtn = $('#spinBtn'), resultEl = $('#result');
+  var listEl = $('#optionList'), countInput = $('#countInput');
+  var addBtn = $('#addBtn'), shuffleBtn = $('#shuffleBtn');
+  var resetBtn = $('#resetBtn'), soundBtn = $('#soundBtn');
+
+  var options = loadOptions();
+  var soundOn = localStorage.getItem(SOUND_KEY) !== '0';
+  var rotation = 0, spinning = false, winnerIndex = -1, lastTickIdx = -1;
+  var audioCtx = null;
+
+  function loadOptions() {
+    try {
+      var arr = JSON.parse(localStorage.getItem(STORE_KEY));
+      if (Array.isArray(arr) && arr.length >= 2 &&
+          arr.every(function (x) { return typeof x === 'string'; })) return arr;
+    } catch (e) {}
+    return DEFAULT_OPTIONS.slice();
+  }
+  function save() { localStorage.setItem(STORE_KEY, JSON.stringify(options)); }
+  function mod(a, n) { return ((a % n) + n) % n; }
+
+  function sizeCanvases() {
+    var rect = wrap.getBoundingClientRect();
+    var dpr = window.devicePixelRatio || 1;
+    [canvas, confCv].forEach(function (cv) {
+      cv.width = Math.round(rect.width * dpr);
+      cv.height = Math.round(rect.height * dpr);
+    });
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+  window.addEventListener('resize', sizeCanvases);
+
+  function draw() {
+    var S = canvas.clientWidth || wrap.clientWidth;
+    if (!S) return;
+    var cx = S / 2, cy = S / 2;
+    var Ro = S / 2 - 2, rimW = 12, Ri = Ro - rimW, Rh = Ri * 0.24;
+    ctx.clearRect(0, 0, S, S);
+    ctx.beginPath(); ctx.arc(cx, cy, Ro, 0, Math.PI * 2);
+    ctx.fillStyle = '#33241d'; ctx.fill();
+    var n = options.length;
+    if (!n) return;
+    var seg = Math.PI * 2 / n;
+    var i, a0;
+    for (i = 0; i < n; i++) {
+      a0 = i * seg + rotation;
+      ctx.beginPath(); ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, Ri, a0, a0 + seg); ctx.closePath();
+      ctx.fillStyle = i === winnerIndex ? LIGHT[i % 12] : PALETTE[i % 12];
+      ctx.fill();
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1;
+    for (i = 0; i < n; i++) {
+      a0 = i * seg + rotation;
+      ctx.beginPath(); ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(a0) * Ri, cy + Math.sin(a0) * Ri);
+      ctx.stroke();
+    }
+    if (winnerIndex >= 0 && winnerIndex < n) {
+      a0 = winnerIndex * seg + rotation;
+      ctx.beginPath(); ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, Ri, a0, a0 + seg); ctx.closePath();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke();
+    }
+    var fsBase = n <= 10 ? 17 : n <= 16 ? 15 : n <= 24 ? 13 : n <= 36 ? 11.5 : n <= 50 ? 10 : 9;
+    var avail = Ri - Rh - 26;
+    for (i = 0; i < n; i++) {
+      var name = options[i] || '';
+      if (!name) continue;
+      var fs = fsBase, txt = name;
+      ctx.textBaseline = 'middle';
+      for (;;) {
+        ctx.font = fs + 'px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
+        if (ctx.measureText(name).width <= avail || fs <= 8.5) break;
+        fs -= 0.5;
+      }
+      if (ctx.measureText(txt).width > avail) {
+        while (txt.length > 1 && ctx.measureText(txt + '\u2026').width > avail) txt = txt.slice(0, -1);
+        txt += '\u2026';
+      }
+      var mid = i * seg + rotation + seg / 2;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(mid);
+      var flipped = Math.cos(mid) < 0;
+      if (flipped) ctx.rotate(Math.PI);
+      ctx.textAlign = flipped ? 'left' : 'right';
+      ctx.fillStyle = '#fff';
+      ctx.shadowColor = 'rgba(0,0,0,0.4)';
+      ctx.shadowBlur = 2;
+      ctx.shadowOffsetY = 1;
+      ctx.fillText(txt, flipped ? -(Ri - 10) : Ri - 10, 0);
+      ctx.restore();
+    }
+  }
+
+  function indexAtPointer() {
+    var n = options.length;
+    if (!n) return -1;
+    var local = mod(-Math.PI / 2 - rotation, Math.PI * 2);
+    return Math.floor(local / (Math.PI * 2 / n)) % n;
+  }
+
+  function ensureAudio() {
+    if (!audioCtx) {
+      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+    }
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  }
+  function blip(freq, dur, gain, type) {
+    if (!soundOn || !audioCtx) return;
+    try {
+      var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = type || 'square';
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(gain, audioCtx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(); o.stop(audioCtx.currentTime + dur);
+    } catch (e) {}
+  }
+  function tickSound() { blip(900 + Math.random() * 250, 0.035, 0.05); }
+  function winSound() {
+    blip(660, 0.12, 0.09, 'sine');
+    setTimeout(function () { blip(880, 0.2, 0.09, 'sine'); }, 120);
+  }
+
+  var confs = [], confRAF = null;
+  function burstConfetti() {
+    var w = confCv.clientWidth, h = confCv.clientHeight;
+    confs = [];
+    for (var i = 0; i < 90; i++) {
+      var a = Math.random() * Math.PI * 2;
+      var sp = 3 + Math.random() * 5;
+      confs.push({
+        x: w / 2, y: h / 2,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 2.5,
+        s: 3 + Math.random() * 4,
+        c: PALETTE[i % 12],
+        r: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.3,
+        life: 1
+      });
+    }
+    if (!confRAF) confRAF = requestAnimationFrame(confLoop);
+  }
+  function confLoop() {
+    var w = confCv.clientWidth, h = confCv.clientHeight;
+    cctx.clearRect(0, 0, w, h);
+    confs.forEach(function (p) {
+      p.x += p.vx; p.y += p.vy; p.vy += 0.12;
+      p.r += p.vr; p.life -= 0.012;
+      cctx.save();
+      cctx.globalAlpha = Math.max(0, p.life);
+      cctx.translate(p.x, p.y);
+      cctx.rotate(p.r);
+      cctx.fillStyle = p.c;
+      cctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.6);
+      cctx.restore();
+    });
+    confs = confs.filter(function (p) { return p.life > 0 && p.y < h + 20; });
+    if (confs.length) { confRAF = requestAnimationFrame(confLoop); }
+    else { confRAF = null; cctx.clearRect(0, 0, w, h); }
+  }
+
+  function setEditorDisabled(d) {
+    listEl.querySelectorAll('input,button').forEach(function (el) { el.disabled = d; });
+    countInput.disabled = d;
+    addBtn.disabled = d;
+    shuffleBtn.disabled = d;
+    resetBtn.disabled = d;
+  }
+
+  function spin() {
+    if (spinning || options.length < 2) return;
+    spinning = true;
+    winnerIndex = -1;
+    resultEl.classList.remove('show');
+    spinBtn.disabled = true;
+    setEditorDisabled(true);
+    ensureAudio();
+    var startRot = rotation;
+    var turns = 4 + Math.random() * 3;
+    var target = startRot + turns * Math.PI * 2 + Math.random() * Math.PI * 2;
+    var dur = 4200 + Math.random() * 900;
+    var t0 = performance.now();
+    function frame(t) {
+      var p = Math.min(1, (t - t0) / dur);
+      var e = 1 - Math.pow(1 - p, 3);
+      rotation = startRot + (target - startRot) * e;
+      draw();
+      var idx = indexAtPointer();
+      if (idx !== lastTickIdx) { lastTickIdx = idx; tickSound(); }
+      if (p < 1) requestAnimationFrame(frame);
+      else finish();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function finish() {
+    spinning = false;
+    winnerIndex = indexAtPointer();
+    lastTickIdx = winnerIndex;
+    draw();
+    showResult(options[winnerIndex] || '');
+    winSound();
+    burstConfetti();
+    spinBtn.disabled = false;
+    setEditorDisabled(false);
+  }
+
+  function showResult(name) {
+    resultEl.textContent = '今天吃：' + name;
+    resultEl.classList.remove('show');
+    void resultEl.offsetWidth;
+    resultEl.classList.add('show');
+  }
+
+  function clearWinner() {
+    winnerIndex = -1;
+    resultEl.classList.remove('show');
+  }
+
+  function renderEditor() {
+    countInput.value = options.length;
+    listEl.innerHTML = '';
+    options.forEach(function (name, i) {
+      var li = document.createElement('li');
+      var idx = document.createElement('span');
+      idx.className = 'idx';
+      idx.textContent = i + 1;
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.maxLength = 20;
+      input.value = name;
+      input.placeholder = '输入菜名';
+      input.addEventListener('input', function (e) {
+        options[i] = e.target.value;
+        save();
+        if (!spinning) { clearWinner(); draw(); }
+      });
+      var del = document.createElement('button');
+      del.className = 'del';
+      del.textContent = '\u00d7';
+      del.title = '删除';
+      del.disabled = options.length <= 2;
+      del.addEventListener('click', function () {
+        if (options.length <= 2) return;
+        options.splice(i, 1);
+        save();
+        clearWinner();
+        renderEditor();
+        draw();
+      });
+      li.appendChild(idx);
+      li.appendChild(input);
+      li.appendChild(del);
+      listEl.appendChild(li);
+    });
+  }
+
+  addBtn.addEventListener('click', function () {
+    if (spinning) return;
+    options.push('');
+    save();
+    clearWinner();
+    renderEditor();
+    draw();
+    var inputs = listEl.querySelectorAll('input[type="text"]');
+    if (inputs.length) inputs[inputs.length - 1].focus();
+  });
+
+  shuffleBtn.addEventListener('click', function () {
+    if (spinning) return;
+    var n = Math.max(2, options.length);
+    var pool = POPULAR_POOL.slice();
+    for (var i = pool.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = pool[i]; pool[i] = pool[j]; pool[j] = t;
+    }
+    options = pool.slice(0, n);
+    while (options.length < n) {
+      options.push(POPULAR_POOL[Math.floor(Math.random() * POPULAR_POOL.length)]);
+    }
+    save();
+    clearWinner();
+    renderEditor();
+    draw();
+  });
+
+  resetBtn.addEventListener('click', function () {
+    if (spinning) return;
+    options = DEFAULT_OPTIONS.slice();
+    save();
+    clearWinner();
+    renderEditor();
+    draw();
+  });
+
+  countInput.addEventListener('change', function () {
+    if (spinning) return;
+    var v = parseInt(countInput.value, 10);
+    if (isNaN(v)) v = options.length;
+    v = Math.max(2, Math.min(100, v));
+    if (v > options.length) {
+      var pool = POPULAR_POOL.filter(function (p) { return options.indexOf(p) === -1; });
+      while (options.length < v) {
+        if (pool.length) options.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+        else options.push(POPULAR_POOL[Math.floor(Math.random() * POPULAR_POOL.length)]);
+      }
+    } else {
+      options.length = v;
+    }
+    save();
+    clearWinner();
+    renderEditor();
+    draw();
+  });
+
+  soundBtn.addEventListener('click', function () {
+    soundOn = !soundOn;
+    localStorage.setItem(SOUND_KEY, soundOn ? '1' : '0');
+    soundBtn.textContent = soundOn ? '音效 开' : '音效 关';
+    if (soundOn) ensureAudio();
+  });
+
+  spinBtn.addEventListener('click', spin);
+  canvas.addEventListener('click', function () { if (!spinning) spin(); });
+  document.addEventListener('keydown', function (e) {
+    if (e.code === 'Space' && !spinning) {
+      var tag = document.activeElement && document.activeElement.tagName;
+      if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'BUTTON') {
+        e.preventDefault();
+        spin();
+      }
+    }
+  });
+
+  soundBtn.textContent = soundOn ? '音效 开' : '音效 关';
+  renderEditor();
+  sizeCanvases();
+})();
+</script>
+</body>
+</html>
