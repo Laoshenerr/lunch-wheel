@@ -103,6 +103,14 @@
   .del:hover { background: #fdeeec; }
   .del:disabled { color: #d8cfc5; cursor: not-allowed; }
   .btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cuisine-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 2px; }
+  .chip {
+    padding: 5px 10px; border-radius: 8px; border: 1px solid var(--border);
+    background: #fff; font-size: 13px; cursor: pointer; color: #6b5a4b;
+    font-family: inherit;
+  }
+  .chip:hover { background: #f7f1ea; }
+  .chip.active { background: var(--primary); border-color: var(--primary); color: #fff; font-weight: 600; }
   .btn {
     padding: 8px 14px; border-radius: 8px; border: 1px solid transparent;
     font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
@@ -136,6 +144,7 @@
       <span>个</span>
     </div>
     <ul id="optionList"></ul>
+    <div class="cuisine-row" id="cuisineRow"></div>
     <div class="btn-row">
       <button class="btn btn-ghost" id="addBtn">添加一项</button>
       <button class="btn btn-primary" id="shuffleBtn">随机热门</button>
@@ -151,27 +160,87 @@
   'use strict';
 
   var DEFAULT_OPTIONS = [
-    '红烧肉', '宫保鸡丁', '鱼香肉丝', '麻婆豆腐', '回锅肉',
-    '糖醋排骨', '可乐鸡翅', '西红柿炒蛋', '青椒肉丝', '酸菜鱼',
-    '水煮肉片', '辣子鸡', '口水鸡', '白切鸡', '红烧鱼',
-    '清蒸鲈鱼', '油焖大虾', '白灼虾', '梅菜扣肉', '东坡肉',
-    '红烧狮子头', '糖醋里脊', '锅包肉', '小鸡炖蘑菇', '大盘鸡',
-    '咖喱鸡', '黑椒牛柳', '番茄牛腩', '土豆炖牛肉', '红烧茄子'
+    '红烧肉', '宫保鸡丁', '水煮鱼', '清蒸鲈鱼', '白灼虾',
+    '油焖大虾', '东坡肉', '松鼠鳜鱼', '佛跳墙', '葱烧海参',
+    '开水白菜', '龙井虾仁', '蟹粉狮子头', '剁椒鱼头', '毛氏红烧肉',
+    '蜜汁叉烧', '脆皮烧鹅', '麻婆豆腐', '鱼香肉丝', '回锅肉',
+    '口水鸡', '白切鸡', '糖醋排骨', '糖醋鲤鱼', '蜜汁火方',
+    '大煮干丝', '姜母鸭', '胡适一品锅', '黑椒牛仔骨', '金汤肥牛'
   ];
 
-  var POPULAR_POOL = [
-    '红烧肉', '宫保鸡丁', '鱼香肉丝', '麻婆豆腐', '回锅肉', '糖醋排骨',
-    '可乐鸡翅', '西红柿炒蛋', '青椒肉丝', '酸菜鱼', '水煮肉片', '辣子鸡',
-    '口水鸡', '白切鸡', '红烧鱼', '清蒸鲈鱼', '油焖大虾', '白灼虾',
-    '梅菜扣肉', '东坡肉', '红烧狮子头', '糖醋里脊', '锅包肉', '小鸡炖蘑菇',
-    '大盘鸡', '咖喱鸡', '黑椒牛柳', '番茄牛腩', '土豆炖牛肉', '红烧茄子',
-    '干煸四季豆', '地三鲜', '鱼香茄子', '韭菜炒蛋', '苦瓜炒蛋', '蚂蚁上树',
-    '京酱肉丝', '滑蛋虾仁', '蒜蓉西兰花', '蚝油生菜', '上汤娃娃菜', '干锅花菜',
-    '香菇滑鸡', '栗子焖鸡', '三杯鸡', '香辣虾', '椒盐虾', '蒜香排骨',
-    '椒盐排骨', '孜然羊肉', '葱爆羊肉', '红烧羊肉', '酱牛肉', '蒜泥白肉',
-    '夫妻肺片', '凉拌黄瓜', '皮蛋豆腐', '醋溜白菜', '尖椒土豆片', '干锅土豆片',
-    '东北乱炖', '猪肉炖粉条', '冬瓜排骨汤', '玉米排骨汤', '麻辣小龙虾'
-  ];
+  var CUISINE_DISHES = {
+    '川菜': [
+      '麻婆豆腐', '宫保鸡丁', '水煮牛肉', '水煮鱼片', '沸腾鱼', '酸菜鱼',
+      '辣子鸡丁', '鱼香肉丝', '鱼香茄子', '蚂蚁上树', '夫妻肺片', '口水鸡',
+      '棒棒鸡丝', '椒麻鸡', '藤椒鸡', '钵钵鸡', '麻辣香锅', '毛血旺',
+      '开水白菜', '鸡豆花', '芙蓉鸡片', '雪花鸡淖', '樟茶鸭', '乐山甜皮鸭',
+      '魔芋烧鸭', '酸萝卜老鸭汤', '甜烧白', '锅巴肉片', '盐煎肉', '回锅肉',
+      '灯影牛肉', '粉蒸牛肉', '干煸四季豆', '干煸牛肉丝', '蒜泥白肉', '红油肚丝',
+      '泡椒凤爪', '泡椒牛蛙', '干锅牛蛙', '馋嘴蛙', '香辣蟹', '香辣虾',
+      '鱼香虾球', '麻辣鱼片', '麻辣小龙虾', '豆瓣鱼', '豆花鱼', '藤椒鱼',
+      '太安鱼', '万州烤鱼', '金汤肥牛', '合川肉片', '小酥肉', '冒菜'
+    ],
+    '粤菜': [
+      '白切鸡', '豉油鸡', '盐焗鸡', '沙姜鸡', '水晶鸡', '手撕鸡',
+      '花雕鸡', '椰子鸡', '猪肚鸡', '脆皮烧鹅', '脆皮烧肉', '蜜汁叉烧',
+      '蜜汁烧排骨', '广式脆皮乳鸽', '豉汁蒸排骨', '豉汁蒸凤爪', '梅菜扣肉',
+      '清蒸鲈鱼', '清蒸石斑鱼', '清蒸多宝鱼', '麒麟鲈鱼', '豉汁蒸白鳝',
+      '白灼虾', '豉油皇虾', '潮汕生腌虾', '蒜蓉粉丝蒸扇贝', '姜葱炒蟹',
+      '避风塘炒蟹', '花雕蒸蟹', '咕噜肉', '椒盐排骨', '椒盐鲜鱿', '沙茶牛肉',
+      '蚝油牛肉', '黑椒牛仔骨', '豉汁凉瓜牛肉', '客家酿豆腐', '潮汕卤鹅',
+      '潮汕牛肉丸', '卤水拼盘', '啫啫鸡煲', '支竹羊腩煲', '咸鱼茄子煲',
+      '白云猪手', '咸蛋蒸肉饼', '滑蛋虾仁', '柱侯牛腩', '大良炒牛奶',
+      '冬瓜盅', '上汤娃娃菜', '白灼菜心', '白灼芥兰', '蚝油生菜', '椒丝腐乳通菜'
+    ],
+    '湘菜': [
+      '剁椒鱼头', '毛氏红烧肉', '农家小炒肉', '小炒黄牛肉', '东安子鸡',
+      '口味虾', '腊味合蒸', '腊肉炒藜蒿', '柴火腊肉', '浏阳豆豉蒸排骨',
+      '麻仁香酥鸭', '芙蓉鲫鱼', '子龙脱袍', '红煨甲鱼', '冰糖湘莲',
+      '手撕包菜', '干锅茶树菇'
+    ],
+    '鲁菜': [
+      '糖醋鲤鱼', '九转大肠', '葱烧海参', '德州扒鸡', '四喜丸子', '油爆双脆',
+      '温拌海螺', '蝴蝶海参', '锅塌豆腐', '奶汤蒲菜', '油焖大虾', '木须肉',
+      '葱烧蹄筋', '葱爆羊肉', '醋椒鱼', '糟溜鱼片', '一品豆腐', '清蒸加吉鱼',
+      '原壳鲍鱼', '泰山三美豆腐', '老醋蜇头', '肉末海参', '扒牛肉条',
+      '糟煨冬笋', '芙蓉干贝', '黄焖鸡块', '糖醋里脊'
+    ],
+    '苏菜': [
+      '松鼠鳜鱼', '蟹粉狮子头', '清炖狮子头', '大煮干丝', '盐水鸭', '盐水鹅',
+      '水晶肴肉', '樱桃肉', '无锡酱排骨', '梁溪脆鳝', '软兜长鱼', '霸王别姬',
+      '三套鸭', '文思豆腐', '拆烩鲢鱼头', '蟹黄豆腐', '清蒸鲥鱼', '清蒸刀鱼',
+      '清炒虾仁', '母油船鸭', '响油鳝糊', '炖生敲', '凤尾虾', '清蒸大闸蟹',
+      '清蒸白鱼', '酱方', '桂花糯米藕'
+    ],
+    '浙菜': [
+      '西湖醋鱼', '东坡肉', '龙井虾仁', '叫化童鸡', '干炸响铃', '宋嫂鱼羹',
+      '荷叶粉蒸肉', '火踵神仙鸭', '蜜汁火方', '清汤越鸡', '油焖春笋',
+      '雪菜大汤黄鱼', '三丝敲鱼', '西湖莼菜汤', '鱼头浓汤', '绍兴醉鸡',
+      '绍兴醉蟹', '江蟹生', '杭州酱鸭', '蟹酿橙'
+    ],
+    '闽菜': [
+      '佛跳墙', '荔枝肉', '醉排骨', '鸡汤汆海蚌', '淡糟香螺片', '白斩河田鸡',
+      '太极芋泥', '炒西施舌', '半月沉江', '海蛎煎', '姜母鸭', '煎糟鳗鱼',
+      '醉糟鸡', '红蟳米糕', '八宝红鲟饭', '白炒鲜竹蛏', '鸳鸯膏蟹'
+    ],
+    '徽菜': [
+      '臭鳜鱼', '徽州毛豆腐', '胡适一品锅', '刀板香', '问政山笋', '火腿炖甲鱼',
+      '黄山炖鸽', '符离集烧鸡', '徽州圆子', '红烧划水', '茶叶熏鸡', '石耳炖鸡',
+      '花菇田鸡', '葡萄鱼', '鱼咬羊', '沙地马蹄鳖', '火腿炖鞭笋'
+    ],
+    '家常菜': [
+      '红烧肉', '可乐鸡翅', '蜜汁鸡翅', '糖醋排骨', '西红柿炒蛋', '香菇滑鸡',
+      '栗子焖鸡', '三杯鸡', '咖喱鸡', '咖喱牛肉', '黑椒牛柳', '椒盐虾',
+      '番茄牛腩', '土豆炖牛肉', '红烧带鱼', '红烧茄子', '家常豆腐', '地三鲜',
+      '蒜蓉粉丝蒸虾', '蚝油杏鲍菇', '蒜蓉西兰花', '凉拌黄瓜', '皮蛋豆腐',
+      '凉拌木耳', '白灼秋葵', '蒜蓉空心菜', '冬瓜排骨汤', '玉米排骨汤', '鲫鱼豆腐汤'
+    ]
+  };
+  var CUISINES = ['川菜', '粤菜', '湘菜', '鲁菜', '苏菜', '浙菜', '闽菜', '徽菜', '家常菜'];
+  var ALL_DISHES = [];
+  CUISINES.forEach(function (c) { ALL_DISHES = ALL_DISHES.concat(CUISINE_DISHES[c]); });
+  var POPULAR_POOL = ALL_DISHES;
+  var currentCuisine = '全部';
 
   var STORE_KEY = 'lunch-wheel-options-v1';
   var SOUND_KEY = 'lunch-wheel-sound-v1';
@@ -194,7 +263,7 @@
   var canvas = $('#wheel'), ctx = canvas.getContext('2d');
   var confCv = $('#confetti'), cctx = confCv.getContext('2d');
   var wrap = $('#wheelWrap'), spinBtn = $('#spinBtn'), resultEl = $('#result');
-  var listEl = $('#optionList'), countInput = $('#countInput');
+  var listEl = $('#optionList'), countInput = $('#countInput'), cuisineRow = $('#cuisineRow');
   var addBtn = $('#addBtn'), shuffleBtn = $('#shuffleBtn');
   var resetBtn = $('#resetBtn'), soundBtn = $('#soundBtn');
 
@@ -455,6 +524,20 @@
     });
   }
 
+  function renderChips() {
+    cuisineRow.innerHTML = '';
+    ['全部'].concat(CUISINES).forEach(function (c) {
+      var b = document.createElement('button');
+      b.className = 'chip' + (c === currentCuisine ? ' active' : '');
+      b.textContent = c;
+      b.addEventListener('click', function () {
+        currentCuisine = c;
+        renderChips();
+      });
+      cuisineRow.appendChild(b);
+    });
+  }
+
   addBtn.addEventListener('click', function () {
     if (spinning) return;
     options.push('');
@@ -469,14 +552,18 @@
   shuffleBtn.addEventListener('click', function () {
     if (spinning) return;
     var n = Math.max(2, options.length);
-    var pool = POPULAR_POOL.slice();
+    var base = currentCuisine === '全部' ? ALL_DISHES : CUISINE_DISHES[currentCuisine];
+    var pool = base.slice();
     for (var i = pool.length - 1; i > 0; i--) {
       var j = Math.floor(Math.random() * (i + 1));
       var t = pool[i]; pool[i] = pool[j]; pool[j] = t;
     }
     options = pool.slice(0, n);
-    while (options.length < n) {
-      options.push(POPULAR_POOL[Math.floor(Math.random() * POPULAR_POOL.length)]);
+    var guard = 0;
+    while (options.length < n && guard < 5000) {
+      guard++;
+      var extra = ALL_DISHES[Math.floor(Math.random() * ALL_DISHES.length)];
+      if (options.indexOf(extra) === -1) options.push(extra);
     }
     save();
     clearWinner();
@@ -533,6 +620,7 @@
   });
 
   soundBtn.textContent = soundOn ? '音效 开' : '音效 关';
+  renderChips();
   renderEditor();
   sizeCanvases();
 })();
