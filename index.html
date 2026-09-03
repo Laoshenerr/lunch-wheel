@@ -34,12 +34,13 @@
   .wheel-col { display: flex; flex-direction: column; align-items: center; }
   .wheel-wrap {
     position: relative;
-    width: min(500px, 92vw);
+    width: 92vw;
+    max-width: 500px;
     aspect-ratio: 1;
     user-select: none;
   }
-  canvas#wheel { position: absolute; inset: 0; width: 100%; height: 100%; }
-  canvas#confetti { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 6; }
+  canvas#wheel { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+  canvas#confetti { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 6; }
   .pointer {
     position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
     width: 34px; height: 30px; z-index: 7;
@@ -284,6 +285,9 @@
   function mod(a, n) { return ((a % n) + n) % n; }
 
   function sizeCanvases() {
+    if (wrap.clientWidth && wrap.clientHeight < 40) {
+      wrap.style.height = wrap.clientWidth + 'px';
+    }
     var rect = wrap.getBoundingClientRect();
     var dpr = window.devicePixelRatio || 1;
     [canvas, confCv].forEach(function (cv) {
