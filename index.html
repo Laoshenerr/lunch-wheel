@@ -375,7 +375,7 @@
       var t = document.createElementNS(NS, 'text');
       t.setAttribute('x', px.toFixed(1)); t.setAttribute('y', py.toFixed(1));
       t.setAttribute('dy', '0.35em');
-      t.setAttribute('text-anchor', 'end');
+      t.setAttribute('text-anchor', flip ? 'start' : 'end');
       t.setAttribute('transform', 'rotate(' + ((mid + (flip ? Math.PI : 0)) * 180 / Math.PI).toFixed(2) + ' ' + px.toFixed(1) + ' ' + py.toFixed(1) + ')');
       t.setAttribute('fill', '#ffffff');
       t.setAttribute('font-family', '"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif');
