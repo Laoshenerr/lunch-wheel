@@ -629,6 +629,11 @@
   renderChips();
   renderEditor();
   sizeCanvases();
+  window.addEventListener('load', sizeCanvases);
+  window.addEventListener('pageshow', sizeCanvases);
+  window.addEventListener('orientationchange', sizeCanvases);
+  setTimeout(sizeCanvases, 300);
+  setTimeout(sizeCanvases, 1200);
 })();
 </script>
 </body>
