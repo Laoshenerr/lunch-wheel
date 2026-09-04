@@ -41,7 +41,7 @@
     aspect-ratio: 1;
     user-select: none;
   }
-  canvas#wheel { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+  #wheelBox { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
   canvas#confetti { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 6; }
   .pointer {
     position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
@@ -132,7 +132,7 @@
   <div class="wheel-col">
     <header><h1>今天吃什么？</h1></header>
     <div class="wheel-wrap" id="wheelWrap">
-      <canvas id="wheel"></canvas>
+      <div id="wheelBox"></div>
       <canvas id="confetti"></canvas>
       <svg class="pointer" viewBox="0 0 40 36"><polygon points="20,34 4,3 36,3" fill="#e2543a" stroke="#fff" stroke-width="3" stroke-linejoin="round"/></svg>
       <button class="hub" id="spinBtn">开转</button>
@@ -263,8 +263,10 @@
   var LIGHT = PALETTE.map(function (c) { return mix(c, 0.25); });
 
   var $ = function (s) { return document.querySelector(s); };
-  var canvas = $('#wheel'), ctx = canvas.getContext('2d');
   var confCv = $('#confetti'), cctx = confCv.getContext('2d');
+  var NS = 'http://www.w3.org/2000/svg';
+  var svgBox = $('#wheelBox'), svgEl = null, gEl = null, bakedRot = 0;
+  var mcv = document.createElement('canvas'), mctx = mcv.getContext('2d');
   var wrap = $('#wheelWrap'), spinBtn = $('#spinBtn'), resultEl = $('#result');
   var listEl = $('#optionList'), countInput = $('#countInput'), cuisineRow = $('#cuisineRow');
   var addBtn = $('#addBtn'), shuffleBtn = $('#shuffleBtn');
@@ -292,77 +294,94 @@
     }
     var rect = wrap.getBoundingClientRect();
     var dpr = window.devicePixelRatio || 1;
-    [canvas, confCv].forEach(function (cv) {
-      cv.width = Math.round(rect.width * dpr);
-      cv.height = Math.round(rect.height * dpr);
-    });
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    confCv.width = Math.round(rect.width * dpr);
+    confCv.height = Math.round(rect.height * dpr);
     cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    renderWheel();
     draw();
   }
   window.addEventListener('resize', sizeCanvases);
 
   function draw() {
-    var S = canvas.clientWidth || wrap.clientWidth;
+    if (!gEl) return;
+    var S = svgBox.clientWidth || wrap.clientWidth;
     if (!S) return;
-    var cx = S / 2, cy = S / 2;
-    var Ro = S / 2 - 2, rimW = 12, Ri = Ro - rimW, Rh = Ri * 0.24;
-    ctx.clearRect(0, 0, S, S);
-    ctx.beginPath(); ctx.arc(cx, cy, Ro, 0, Math.PI * 2);
-    ctx.fillStyle = '#33241d'; ctx.fill();
+    var deg = (rotation - bakedRot) * 180 / Math.PI;
+    gEl.setAttribute('transform', 'rotate(' + deg.toFixed(3) + ' ' + (S / 2) + ' ' + (S / 2) + ')');
+  }
+
+  function renderWheel() {
+    var S = svgBox.clientWidth || wrap.clientWidth;
+    if (!S) return;
+    if (!svgEl) {
+      svgEl = document.createElementNS(NS, 'svg');
+      svgEl.setAttribute('width', '100%');
+      svgEl.setAttribute('height', '100%');
+      gEl = document.createElementNS(NS, 'g');
+      svgEl.appendChild(gEl);
+      svgBox.appendChild(svgEl);
+    }
+    svgEl.setAttribute('viewBox', '0 0 ' + S + ' ' + S);
+    while (gEl.firstChild) gEl.removeChild(gEl.firstChild);
     var n = options.length;
     if (!n) return;
+    var cx = S / 2, cy = S / 2;
+    var Ro = S / 2 - 2, rimW = 12, Ri = Ro - rimW;
+    var rim = document.createElementNS(NS, 'circle');
+    rim.setAttribute('cx', cx); rim.setAttribute('cy', cy); rim.setAttribute('r', Ro);
+    rim.setAttribute('fill', '#33241d');
+    gEl.appendChild(rim);
+    bakedRot = rotation;
     var seg = Math.PI * 2 / n;
-    var i, a0;
+    var i, a0, a1;
+    for (i = 0; i < n; i++) {
+      a0 = i * seg + rotation; a1 = a0 + seg;
+      var p = document.createElementNS(NS, 'path');
+      p.setAttribute('d', 'M' + cx + ' ' + cy +
+        ' L' + (cx + Math.cos(a0) * Ri).toFixed(2) + ' ' + (cy + Math.sin(a0) * Ri).toFixed(2) +
+        ' A' + Ri + ' ' + Ri + ' 0 0 1 ' + (cx + Math.cos(a1) * Ri).toFixed(2) + ' ' + (cy + Math.sin(a1) * Ri).toFixed(2) + ' Z');
+      p.setAttribute('fill', i === winnerIndex ? LIGHT[i % 12] : PALETTE[i % 12]);
+      if (i === winnerIndex) { p.setAttribute('stroke', '#fff'); p.setAttribute('stroke-width', '3'); }
+      gEl.appendChild(p);
+    }
     for (i = 0; i < n; i++) {
       a0 = i * seg + rotation;
-      ctx.beginPath(); ctx.moveTo(cx, cy);
-      ctx.arc(cx, cy, Ri, a0, a0 + seg); ctx.closePath();
-      ctx.fillStyle = i === winnerIndex ? LIGHT[i % 12] : PALETTE[i % 12];
-      ctx.fill();
-    }
-    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1;
-    for (i = 0; i < n; i++) {
-      a0 = i * seg + rotation;
-      ctx.beginPath(); ctx.moveTo(cx, cy);
-      ctx.lineTo(cx + Math.cos(a0) * Ri, cy + Math.sin(a0) * Ri);
-      ctx.stroke();
-    }
-    if (winnerIndex >= 0 && winnerIndex < n) {
-      a0 = winnerIndex * seg + rotation;
-      ctx.beginPath(); ctx.moveTo(cx, cy);
-      ctx.arc(cx, cy, Ri, a0, a0 + seg); ctx.closePath();
-      ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke();
+      var ln = document.createElementNS(NS, 'line');
+      ln.setAttribute('x1', cx); ln.setAttribute('y1', cy);
+      ln.setAttribute('x2', (cx + Math.cos(a0) * Ri).toFixed(2));
+      ln.setAttribute('y2', (cy + Math.sin(a0) * Ri).toFixed(2));
+      ln.setAttribute('stroke', 'rgba(255,255,255,0.35)'); ln.setAttribute('stroke-width', '1');
+      gEl.appendChild(ln);
     }
     var fsBase = n <= 10 ? 17 : n <= 16 ? 15 : n <= 24 ? 13 : n <= 36 ? 11.5 : n <= 50 ? 10 : 9;
-    var avail = Ri - Rh - 26;
+    var avail = Ri - Ri * 0.24 - 26;
     for (i = 0; i < n; i++) {
       var name = options[i] || '';
       if (!name) continue;
       var fs = fsBase, txt = name;
-      ctx.textBaseline = 'middle';
       for (;;) {
-        ctx.font = fs + 'px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
-        if (ctx.measureText(name).width <= avail || fs <= 8.5) break;
+        mctx.font = fs + 'px "PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif';
+        if (mctx.measureText(name).width <= avail || fs <= 8.5) break;
         fs -= 0.5;
       }
-      if (ctx.measureText(txt).width > avail) {
-        while (txt.length > 1 && ctx.measureText(txt + '\u2026').width > avail) txt = txt.slice(0, -1);
+      if (mctx.measureText(txt).width > avail) {
+        while (txt.length > 1 && mctx.measureText(txt + '\u2026').width > avail) txt = txt.slice(0, -1);
         txt += '\u2026';
       }
       var mid = i * seg + rotation + seg / 2;
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(mid);
-      var flipped = Math.cos(mid) < 0;
-      if (flipped) ctx.rotate(Math.PI);
-      ctx.textAlign = flipped ? 'left' : 'right';
-      ctx.fillStyle = '#fff';
-      ctx.shadowColor = 'rgba(0,0,0,0.4)';
-      ctx.shadowBlur = 2;
-      ctx.shadowOffsetY = 1;
-      ctx.fillText(txt, flipped ? -(Ri - 10) : Ri - 10, 0);
-      ctx.restore();
+      var flip = Math.cos(mid) < 0;
+      var px = cx + Math.cos(mid) * (Ri - 10);
+      var py = cy + Math.sin(mid) * (Ri - 10);
+      var t = document.createElementNS(NS, 'text');
+      t.setAttribute('x', px.toFixed(1)); t.setAttribute('y', py.toFixed(1));
+      t.setAttribute('dy', '0.35em');
+      t.setAttribute('text-anchor', 'end');
+      t.setAttribute('transform', 'rotate(' + ((mid + (flip ? Math.PI : 0)) * 180 / Math.PI).toFixed(2) + ' ' + px.toFixed(1) + ' ' + py.toFixed(1) + ')');
+      t.setAttribute('fill', '#ffffff');
+      t.setAttribute('font-family', '"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif');
+      t.setAttribute('font-size', fs);
+      t.textContent = txt;
+      gEl.appendChild(t);
     }
   }
 
@@ -446,6 +465,7 @@
     if (spinning || options.length < 2) return;
     spinning = true;
     winnerIndex = -1;
+    renderWheel();
     resultEl.classList.remove('show');
     spinBtn.disabled = true;
     setEditorDisabled(true);
@@ -472,6 +492,7 @@
     spinning = false;
     winnerIndex = indexAtPointer();
     lastTickIdx = winnerIndex;
+    renderWheel();
     draw();
     showResult(options[winnerIndex] || '');
     winSound();
@@ -489,6 +510,7 @@
 
   function clearWinner() {
     winnerIndex = -1;
+    renderWheel();
     resultEl.classList.remove('show');
   }
 
@@ -614,7 +636,7 @@
   });
 
   spinBtn.addEventListener('click', spin);
-  canvas.addEventListener('click', function () { if (!spinning) spin(); });
+  svgBox.addEventListener('click', function () { if (!spinning) spin(); });
   document.addEventListener('keydown', function (e) {
     if (e.code === 'Space' && !spinning) {
       var tag = document.activeElement && document.activeElement.tagName;
